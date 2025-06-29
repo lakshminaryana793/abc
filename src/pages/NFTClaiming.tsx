@@ -14,6 +14,8 @@ interface ClaimableOrder {
   customer_wallet_address: string;
   status: string;
   has_custom_nft: boolean;
+  nft_claimable: boolean;
+  nft_minted: boolean;
   products: {
     name: string;
     image_url: string;
@@ -68,7 +70,10 @@ export const NFTClaiming: React.FC = () => {
   } | null>(null);
 
   const contractAddress = import.meta.env.VITE_NFT_CONTRACT_ADDRESS;
-  const isContractConfigured = contractAddress && contractAddress !== 'your_deployed_contract_address_here';
+  const isContractConfigured = contractAddress && 
+    contractAddress !== 'your_deployed_contract_address_here' && 
+    contractAddress !== 'deployed_contract_address_placeholder' &&
+    contractAddress.startsWith('0x');
 
   useEffect(() => {
     if (isConnected && address) {
@@ -82,12 +87,41 @@ export const NFTClaiming: React.FC = () => {
     if (!address) return;
     
     try {
-      const orders = await db.getClaimableOrders(address);
-      setClaimableOrders(orders);
+      // Get orders that are claimable for this wallet address
+      const { data: orders, error } = await db.supabase
+        .from('orders')
+        .select(`
+          id,
+          product_id,
+          size,
+          quantity,
+          customer_wallet_address,
+          status,
+          has_custom_nft,
+          nft_claimable,
+          nft_minted,
+          products (
+            name,
+            image_url,
+            max_edition,
+            serial_prefix
+          )
+        `)
+        .eq('customer_wallet_address', address)
+        .eq('nft_claimable', true)
+        .eq('nft_minted', false)
+        .in('status', ['confirmed', 'delivered']);
+
+      if (error) {
+        console.error('Error loading claimable orders:', error);
+        throw error;
+      }
+
+      setClaimableOrders(orders || []);
 
       // Load NFT templates for orders with custom NFTs
       const templatesMap: Record<string, NFTTemplate> = {};
-      for (const order of orders) {
+      for (const order of orders || []) {
         if (order.has_custom_nft) {
           const { data } = await db.supabase
             .from('nft_templates')
@@ -123,11 +157,35 @@ export const NFTClaiming: React.FC = () => {
 
     setSearchLoading(true);
     try {
-      const orders = await db.getOrdersReadyForWallet(searchEmail);
-      setPendingOrders(orders);
+      // Search for orders by email in customer_info
+      const { data: orders, error } = await db.supabase
+        .from('orders')
+        .select(`
+          id,
+          product_id,
+          size,
+          quantity,
+          status,
+          customer_info,
+          customer_wallet_address,
+          products (
+            name,
+            image_url
+          )
+        `)
+        .contains('customer_info', { email: searchEmail })
+        .in('status', ['confirmed', 'delivered'])
+        .is('customer_wallet_address', null);
+
+      if (error) {
+        console.error('Error searching orders:', error);
+        throw error;
+      }
+
+      setPendingOrders(orders || []);
       
-      if (orders.length === 0) {
-        toast.info('No confirmed orders found with this email. Orders must be confirmed to be eligible for NFT claiming.');
+      if (!orders || orders.length === 0) {
+        toast.info('No confirmed orders found with this email that need wallet addresses.');
       } else {
         toast.success(`Found ${orders.length} order(s) ready for wallet address`);
       }
@@ -147,7 +205,19 @@ export const NFTClaiming: React.FC = () => {
 
     setAddingWallet(orderId);
     try {
-      await db.updateOrderWalletAddress(orderId, address);
+      const { error } = await db.supabase
+        .from('orders')
+        .update({ 
+          customer_wallet_address: address,
+          nft_claimable: true 
+        })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error updating order:', error);
+        throw error;
+      }
+
       toast.success('Wallet address added successfully! Your NFT is now available for claiming.');
       
       // Refresh the search results
@@ -182,7 +252,7 @@ export const NFTClaiming: React.FC = () => {
     }
 
     if (!isContractConfigured) {
-      toast.error('NFT contract not deployed yet. Please contact support to deploy the contract first.');
+      toast.error('NFT contract not deployed yet. Please follow the deployment guide to deploy the contract first.');
       return;
     }
 
@@ -202,6 +272,7 @@ export const NFTClaiming: React.FC = () => {
 
       let metadataUri: string;
       let serialNumber: string;
+      let editionNumber = 1;
 
       if (order.has_custom_nft && nftTemplates[order.id]) {
         // Use custom NFT template
@@ -215,6 +286,7 @@ export const NFTClaiming: React.FC = () => {
 
         metadataUri = `data:application/json;base64,${btoa(JSON.stringify(template.metadata_json))}`;
         serialNumber = template.serial_number;
+        editionNumber = template.edition_number;
 
         setClaimProgress({
           orderId: order.id,
@@ -229,8 +301,19 @@ export const NFTClaiming: React.FC = () => {
           progress: 30
         });
 
-        const editionNumber = 1; // This would be calculated based on actual minting
-        serialNumber = `${order.products.serial_prefix}-${Date.now().toString().slice(-6)}`;
+        // Get current edition number for this product
+        const { data: existingNFTs } = await db.supabase
+          .from('nfts')
+          .select('edition_number')
+          .eq('product_id', order.product_id)
+          .order('edition_number', { ascending: false })
+          .limit(1);
+
+        editionNumber = existingNFTs && existingNFTs.length > 0 
+          ? existingNFTs[0].edition_number + 1 
+          : 1;
+
+        serialNumber = `${order.products.serial_prefix}-${editionNumber.toString().padStart(4, '0')}`;
 
         const metadata = {
           name: `${order.products.name} - Edition #${editionNumber}`,
@@ -240,7 +323,8 @@ export const NFTClaiming: React.FC = () => {
             { trait_type: 'Product Name', value: order.products.name },
             { trait_type: 'Size', value: order.size },
             { trait_type: 'Serial Number', value: serialNumber },
-            { trait_type: 'Edition Number', value: editionNumber }
+            { trait_type: 'Edition Number', value: editionNumber },
+            { trait_type: 'Max Edition', value: order.products.max_edition }
           ]
         };
 
@@ -270,19 +354,34 @@ export const NFTClaiming: React.FC = () => {
       });
 
       // Save NFT record to database
-      await db.createNFT({
-        token_id: tokenId,
-        owner_address: address,
-        product_id: order.product_id,
-        order_id: order.id,
-        metadata_uri: metadataUri,
-        edition_number: 1,
-        serial_code: serialNumber,
-        custom_nft_id: order.has_custom_nft ? nftTemplates[order.id]?.id : null
-      });
+      const { error: nftError } = await db.supabase
+        .from('nfts')
+        .insert({
+          token_id: tokenId,
+          owner_address: address,
+          product_id: order.product_id,
+          order_id: order.id,
+          metadata_uri: metadataUri,
+          edition_number: editionNumber,
+          serial_code: serialNumber,
+          custom_nft_id: order.has_custom_nft ? nftTemplates[order.id]?.id : null
+        });
+
+      if (nftError) {
+        console.error('Error saving NFT record:', nftError);
+        throw new Error('Failed to save NFT record to database');
+      }
 
       // Update order to mark NFT as minted
-      await db.updateOrder(order.id, { nft_minted: true });
+      const { error: orderError } = await db.supabase
+        .from('orders')
+        .update({ nft_minted: true })
+        .eq('id', order.id);
+
+      if (orderError) {
+        console.error('Error updating order:', orderError);
+        // Don't throw here as the NFT was successfully minted
+      }
 
       // Update NFT template status if custom NFT
       if (order.has_custom_nft && nftTemplates[order.id]) {
@@ -299,7 +398,7 @@ export const NFTClaiming: React.FC = () => {
       });
 
       toast.success(
-        `Successfully claimed your unique NFT! Check your wallet or NFT marketplace to view it.`,
+        `Successfully claimed your unique NFT! Token ID: ${tokenId}. Check your wallet or NFT marketplace to view it.`,
         { duration: 5000 }
       );
       
@@ -319,7 +418,7 @@ export const NFTClaiming: React.FC = () => {
       } else if (error.message.includes('network')) {
         toast.error('Network error. Please check your connection and try again.');
       } else if (error.message.includes('not deployed') || error.message.includes('contract not')) {
-        toast.error('NFT contract not deployed yet. Please contact support to deploy the contract.');
+        toast.error('NFT contract not deployed yet. Please follow the deployment guide to deploy the contract.');
       } else {
         toast.error(error.message || 'Failed to claim NFT. Please try again.');
       }
@@ -364,11 +463,17 @@ export const NFTClaiming: React.FC = () => {
             <div className="mt-8 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg text-left">
               <div className="flex items-center space-x-2 mb-2">
                 <Settings className="h-5 w-5 text-yellow-400" />
-                <span className="text-yellow-300 font-semibold">Setup Required</span>
+                <span className="text-yellow-300 font-semibold">Contract Setup Required</span>
               </div>
-              <p className="text-yellow-200 text-sm">
-                NFT contract needs to be deployed. Please contact support to complete the setup.
+              <p className="text-yellow-200 text-sm mb-2">
+                NFT contract needs to be deployed to enable claiming.
               </p>
+              <Link
+                to="/admin"
+                className="text-yellow-300 hover:text-yellow-200 text-sm underline"
+              >
+                View deployment guide →
+              </Link>
             </div>
           )}
         </div>
@@ -450,7 +555,7 @@ export const NFTClaiming: React.FC = () => {
                         <span className="text-green-300 text-sm font-medium">Ready for NFT Claiming</span>
                       </div>
                       <p className="text-green-200 text-xs mt-1">
-                        Order confirmed - NFT available immediately
+                        Order confirmed - NFT available after adding wallet
                       </p>
                     </div>
 
@@ -559,11 +664,24 @@ export const NFTClaiming: React.FC = () => {
             <div className="flex items-start space-x-4">
               <Settings className="h-6 w-6 text-yellow-400 mt-1 flex-shrink-0" />
               <div>
-                <h3 className="text-lg font-semibold text-yellow-300 mb-2">Contract Setup Required</h3>
-                <div className="text-yellow-200 text-sm space-y-1">
-                  <p>• The NFT smart contract needs to be deployed to Polygon Amoy testnet</p>
-                  <p>• Please contact support to complete the contract deployment</p>
-                  <p>• Once deployed, you'll be able to claim your NFTs immediately</p>
+                <h3 className="text-lg font-semibold text-yellow-300 mb-2">Contract Deployment Required</h3>
+                <div className="text-yellow-200 text-sm space-y-2">
+                  <p>The NFT smart contract needs to be deployed before users can claim NFTs.</p>
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3 mt-3">
+                    <p className="font-medium mb-2">To deploy the contract:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-xs">
+                      <li>Navigate to the <code className="bg-yellow-500/20 px-1 rounded">contracts</code> folder</li>
+                      <li>Follow the instructions in <code className="bg-yellow-500/20 px-1 rounded">deploy-contract-guide.md</code></li>
+                      <li>Update the <code className="bg-yellow-500/20 px-1 rounded">.env</code> file with the deployed contract address</li>
+                    </ol>
+                  </div>
+                  <Link
+                    to="/admin"
+                    className="inline-flex items-center space-x-1 text-yellow-300 hover:text-yellow-200 text-sm underline mt-2"
+                  >
+                    <span>View admin panel for deployment guide</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </Link>
                 </div>
               </div>
             </div>
@@ -577,7 +695,7 @@ export const NFTClaiming: React.FC = () => {
             </div>
             <h2 className="text-2xl font-bold text-white mb-4">No NFTs Ready to Claim</h2>
             <p className="text-gray-300 mb-8 max-w-2xl mx-auto">
-              NFTs become available for claiming immediately after your orders are confirmed and you've added your wallet address.
+              NFTs become available for claiming after your orders are confirmed and you've added your wallet address.
             </p>
             
             <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-6 max-w-md mx-auto mb-8">
@@ -589,11 +707,11 @@ export const NFTClaiming: React.FC = () => {
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-purple-400 rounded-full"></div>
-                  <span>Admin uploads unique NFT for your order</span>
+                  <span>Add your wallet address to the order</span>
                 </div>
                 <div className="flex items-center space-x-2">
                   <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                  <span>Connect wallet and claim your NFT!</span>
+                  <span>Claim your unique NFT!</span>
                 </div>
               </div>
             </div>
