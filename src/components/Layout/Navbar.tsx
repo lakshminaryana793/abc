@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ShoppingCart, Wallet, User, Shirt, Gift, Package, Home, Grid3X3, Menu, X } from 'lucide-react';
-import { useWalletStore } from '../../store/wallet';
+import { ShoppingCart, User, Shirt, Gift, Package, Home, Grid3X3, Menu, X } from 'lucide-react';
 import { useCartStore } from '../../store/cart';
-import { WalletButton } from '../Web3/WalletButton';
+import { useAuthStore } from '../../store/auth';
+import { UserButton } from '../Auth/UserButton';
 
 export const Navbar: React.FC = () => {
   const location = useLocation();
-  const { isConnected } = useWalletStore();
+  const { isAuthenticated, isAdmin } = useAuthStore();
   const { getTotalItems } = useCartStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -65,7 +65,7 @@ export const Navbar: React.FC = () => {
               <Grid3X3 className="h-4 w-4" />
               <span>Products</span>
             </Link>
-            {isConnected && (
+            {isAuthenticated && (
               <>
                 <Link
                   to="/orders"
@@ -91,6 +91,19 @@ export const Navbar: React.FC = () => {
                 </Link>
               </>
             )}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  isActive('/admin') 
+                    ? 'text-purple-400 bg-purple-400/10' 
+                    : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                }`}
+              >
+                <User className="h-4 w-4" />
+                <span>Admin</span>
+              </Link>
+            )}
           </div>
 
           {/* Right Side Actions */}
@@ -109,21 +122,10 @@ export const Navbar: React.FC = () => {
               )}
             </Link>
 
-            {/* Wallet Connection - Hidden on mobile, shown in mobile menu */}
+            {/* User Button - Hidden on mobile, shown in mobile menu */}
             <div className="hidden sm:block">
-              <WalletButton />
+              <UserButton />
             </div>
-
-            {/* Admin Link (only show if connected) - Desktop only */}
-            {isConnected && (
-              <Link
-                to="/admin"
-                className="hidden sm:block p-2 text-gray-300 hover:text-white hover:bg-gray-800 rounded-md transition-colors"
-                title="Admin Panel"
-              >
-                <User className="h-6 w-6" />
-              </Link>
-            )}
 
             {/* Mobile Menu Button */}
             <button
@@ -168,7 +170,7 @@ export const Navbar: React.FC = () => {
               <Grid3X3 className="h-5 w-5" />
               <span>Products</span>
             </Link>
-            {isConnected && (
+            {isAuthenticated && (
               <>
                 <Link
                   to="/orders"
@@ -194,24 +196,26 @@ export const Navbar: React.FC = () => {
                   <Gift className="h-5 w-5" />
                   <span>Claim NFTs</span>
                 </Link>
-                <Link
-                  to="/admin"
-                  className={`flex items-center space-x-3 px-3 py-3 rounded-md text-base font-medium transition-colors ${
-                    isActive('/admin') 
-                      ? 'text-purple-400 bg-purple-400/10' 
-                      : 'text-gray-300 hover:text-white hover:bg-gray-800'
-                  }`}
-                  onClick={closeMobileMenu}
-                >
-                  <User className="h-5 w-5" />
-                  <span>Admin Panel</span>
-                </Link>
               </>
             )}
+            {isAdmin && (
+              <Link
+                to="/admin"
+                className={`flex items-center space-x-3 px-3 py-3 rounded-md text-base font-medium transition-colors ${
+                  isActive('/admin') 
+                    ? 'text-purple-400 bg-purple-400/10' 
+                    : 'text-gray-300 hover:text-white hover:bg-gray-800'
+                }`}
+                onClick={closeMobileMenu}
+              >
+                <User className="h-5 w-5" />
+                <span>Admin Panel</span>
+              </Link>
+            )}
             
-            {/* Wallet Connection in Mobile Menu */}
+            {/* User Button in Mobile Menu */}
             <div className="px-3 py-3">
-              <WalletButton />
+              <UserButton />
             </div>
           </div>
         </div>

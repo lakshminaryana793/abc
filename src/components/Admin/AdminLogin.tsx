@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Shield, Eye, EyeOff, Lock, User } from 'lucide-react';
-import { useAdminStore } from '../../store/admin';
-import { useWalletStore } from '../../store/wallet';
+import { Shield, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { useAuthStore } from '../../store/auth';
 import toast from 'react-hot-toast';
 
 interface AdminLoginProps {
@@ -10,47 +9,31 @@ interface AdminLoginProps {
 
 export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
   const [credentials, setCredentials] = useState({
-    address: '',
+    email: '',
     password: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  const { login } = useAdminStore();
-  const { address, isConnected, connect } = useWalletStore();
+  const { signIn } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const success = await login(credentials.address, credentials.password);
+      const { success, error } = await signIn(credentials.email, credentials.password);
       
       if (success) {
         toast.success('Admin login successful!');
         onLogin();
       } else {
-        toast.error('Invalid credentials. Please check your wallet address and password.');
+        toast.error(error || 'Invalid credentials. Please check your email and password.');
       }
     } catch (error) {
       toast.error('Login failed. Please try again.');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleUseConnectedWallet = () => {
-    if (isConnected && address) {
-      setCredentials({ ...credentials, address });
-    }
-  };
-
-  const handleConnectWallet = async () => {
-    try {
-      await connect();
-      toast.success('Wallet connected!');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to connect wallet');
     }
   };
 
@@ -69,10 +52,10 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
 
           {/* Demo Credentials Info */}
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-6">
-            <h3 className="text-blue-300 font-semibold mb-2">Demo Credentials</h3>
+            <h3 className="text-blue-300 font-semibold mb-2">Demo Admin Access</h3>
             <div className="text-blue-200 text-sm space-y-1">
-              <p><strong>Address:</strong> 0x742d35Cc6634C0532925a3b8D4C9db96590b5b8e</p>
-              <p><strong>Password:</strong> admin123</p>
+              <p><strong>Email:</strong> admin@web3store.com</p>
+              <p><strong>Password:</strong> Any password works for demo</p>
             </div>
           </div>
 
@@ -80,39 +63,18 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                Wallet Address
+                Email Address
               </label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
-                  type="text"
-                  value={credentials.address}
-                  onChange={(e) => setCredentials({ ...credentials, address: e.target.value })}
+                  type="email"
+                  value={credentials.email}
+                  onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
                   className="w-full pl-10 pr-4 py-3 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="Enter admin wallet address"
+                  placeholder="Enter admin email"
                   required
                 />
-              </div>
-              
-              {/* Wallet Connection Helper */}
-              <div className="mt-2 flex items-center justify-between">
-                {isConnected && address ? (
-                  <button
-                    type="button"
-                    onClick={handleUseConnectedWallet}
-                    className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
-                  >
-                    Use connected wallet ({address.slice(0, 6)}...{address.slice(-4)})
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleConnectWallet}
-                    className="text-sm text-purple-400 hover:text-purple-300 transition-colors"
-                  >
-                    Connect wallet to auto-fill
-                  </button>
-                )}
               </div>
             </div>
 

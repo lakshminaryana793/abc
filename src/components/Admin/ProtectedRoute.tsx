@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAdminStore } from '../../store/admin';
+import { useAuthStore } from '../../store/auth';
 import { AdminLogin } from './AdminLogin';
 
 interface ProtectedRouteProps {
@@ -7,9 +7,9 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
-  const { isAuthenticated } = useAdminStore();
+  const { isAuthenticated, isAdmin } = useAuthStore();
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !isAdmin) {
     return <AdminLogin onLogin={() => {}} />;
   }
 

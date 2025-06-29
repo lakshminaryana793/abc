@@ -12,15 +12,15 @@ import { NFTClaiming } from './pages/NFTClaiming';
 import { TrackOrders } from './pages/TrackOrders';
 import { AdminPanel } from './pages/AdminPanel';
 import { ProtectedRoute } from './components/Admin/ProtectedRoute';
-import { useWalletStore } from './store/wallet';
+import { useAuthStore } from './store/auth';
 
 function App() {
-  const { checkConnection } = useWalletStore();
+  const { checkAuth } = useAuthStore();
 
   useEffect(() => {
-    // Check if wallet is already connected on app load
-    checkConnection();
-  }, [checkConnection]);
+    // Check authentication status on app load
+    checkAuth();
+  }, [checkAuth]);
 
   return (
     <Router>

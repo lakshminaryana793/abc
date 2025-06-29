@@ -2,20 +2,22 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Smartphone, Truck, CheckCircle, Loader } from 'lucide-react';
 import { useCartStore } from '../store/cart';
-import { useWalletStore } from '../store/wallet';
+import { useAuthStore } from '../store/auth';
+import { AuthModal } from '../components/Auth/AuthModal';
 import { db } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 export const Checkout: React.FC = () => {
   const navigate = useNavigate();
   const { items, getTotalPrice, clearCart } = useCartStore();
-  const { address, isConnected } = useWalletStore();
+  const { user, isAuthenticated } = useAuthStore();
   
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'upi' | 'cod'>('card');
   const [processing, setProcessing] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const [customerInfo, setCustomerInfo] = useState({
-    name: '',
-    email: '',
+    name: user?.email?.split('@')[0] || '',
+    email: user?.email || '',
     phone: '',
     address: '',
     city: '',
@@ -68,7 +70,7 @@ export const Checkout: React.FC = () => {
       // Create orders for each item
       const orderPromises = items.map(async (item) => {
         const orderData = {
-          user_address: address || 'guest_' + Date.now(),
+          user_address: user?.id || 'guest_' + Date.now(),
           product_id: item.product.id,
           size: item.size,
           quantity: item.quantity,
@@ -76,7 +78,7 @@ export const Checkout: React.FC = () => {
           status: 'confirmed', // Immediately confirmed for NFT claiming
           customer_info: customerInfo,
           payment_method: paymentMethod,
-          customer_wallet_address: address || null // Add wallet address if connected
+          customer_wallet_address: null // Will be added later for NFT claiming
         };
 
         return await db.createOrder(orderData);
@@ -90,7 +92,7 @@ export const Checkout: React.FC = () => {
       // Clear cart
       clearCart();
 
-      toast.success('Order placed successfully! Your NFTs are ready for claiming.');
+      toast.success('Order placed successfully! Your NFTs will be ready for claiming once you add your wallet address.');
       
       // Navigate to success page with order details
       navigate('/order-success', { 
@@ -123,6 +125,26 @@ export const Checkout: React.FC = () => {
         </Link>
 
         <h1 className="text-4xl font-bold text-white mb-8">Checkout</h1>
+
+        {/* Login Prompt for Guest Users */}
+        {!isAuthenticated && (
+          <div className="mb-8 bg-blue-500/10 border border-blue-500/30 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-blue-300 mb-2">Sign in for a better experience</h3>
+                <p className="text-blue-200 text-sm">
+                  Create an account to track your orders and manage your NFT collection easily.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowAuthModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold transition-colors"
+              >
+                Sign In
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Customer Information */}
@@ -347,13 +369,11 @@ export const Checkout: React.FC = () => {
                 <span className="text-purple-300 font-medium">NFT Benefits</span>
               </div>
               <p className="text-purple-200 text-sm">
-                🎨 {items.reduce((sum, item) => sum + item.quantity, 0)} unique NFT{items.reduce((sum, item) => sum + item.quantity, 0) > 1 ? 's' : ''} will be available immediately
+                🎨 {items.reduce((sum, item) => sum + item.quantity, 0)} unique NFT{items.reduce((sum, item) => sum + item.quantity, 0) > 1 ? 's' : ''} will be available for claiming
               </p>
-              {!isConnected && (
-                <p className="text-yellow-300 text-sm mt-1">
-                  💡 Connect wallet after payment to claim NFTs instantly
-                </p>
-              )}
+              <p className="text-yellow-300 text-sm mt-1">
+                💡 Add your wallet address after purchase to claim NFTs instantly
+              </p>
             </div>
 
             <button
@@ -376,6 +396,12 @@ export const Checkout: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+      />
     </div>
   );
 };
