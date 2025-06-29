@@ -1,50 +1,42 @@
 const hre = require("hardhat");
 
 async function main() {
-  console.log("Deploying ClothingNFT contract to Polygon Amoy...");
+  console.log("Deploying ClothingNFT contract to", hre.network.name, "...");
 
-  // Get the ContractFactory and Signers
+  // Get the ContractFactory and Signers here
   const ClothingNFT = await hre.ethers.getContractFactory("ClothingNFT");
   
   // Deploy the contract
-  const clothingNFT = await ClothingNFT.deploy(
-    "Web3Store Clothing",  // name
-    "W3SC"                 // symbol
-  );
+  const clothingNFT = await ClothingNFT.deploy();
+  
+  await clothingNFT.deployed();
 
-  await clothingNFT.waitForDeployment();
-
-  const contractAddress = await clothingNFT.getAddress();
-  console.log("ClothingNFT deployed to:", contractAddress);
+  console.log("ClothingNFT deployed to:", clothingNFT.address);
 
   // Wait for a few block confirmations
-  console.log("Waiting for block confirmations...");
-  await clothingNFT.deploymentTransaction().wait(5);
-
-  // Verify the contract on Polygonscan
-  try {
-    console.log("Verifying contract...");
-    await hre.run("verify:verify", {
-      address: contractAddress,
-      constructorArguments: [
-        "Web3Store Clothing",
-        "W3SC"
-      ],
-    });
-    console.log("Contract verified successfully");
-  } catch (error) {
-    console.log("Verification failed:", error.message);
+  if (hre.network.name !== "hardhat") {
+    console.log("Waiting for block confirmations...");
+    await clothingNFT.deployTransaction.wait(6);
+    
+    // Verify the contract on Etherscan/Polygonscan
+    try {
+      console.log("Verifying contract...");
+      await hre.run("verify:verify", {
+        address: clothingNFT.address,
+        constructorArguments: [],
+      });
+      console.log("Contract verified successfully");
+    } catch (error) {
+      console.log("Error verifying contract:", error.message);
+    }
   }
 
-  console.log("\nDeployment Summary:");
-  console.log("==================");
-  console.log("Contract Address:", contractAddress);
+  console.log("\n=== Deployment Summary ===");
   console.log("Network:", hre.network.name);
-  console.log("Deployer:", (await hre.ethers.getSigners())[0].address);
-  console.log("\nIMPORTANT: Add this contract address to your .env file:");
-  console.log(`VITE_NFT_CONTRACT_ADDRESS=${contractAddress}`);
-  console.log("\nYou can view your contract on Polygonscan:");
-  console.log(`https://amoy.polygonscan.com/address/${contractAddress}`);
+  console.log("Contract Address:", clothingNFT.address);
+  console.log("Deployer:", await clothingNFT.owner());
+  console.log("\nUpdate your .env file with:");
+  console.log(`VITE_NFT_CONTRACT_ADDRESS=${clothingNFT.address}`);
 }
 
 main()
