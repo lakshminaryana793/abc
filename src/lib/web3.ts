@@ -10,6 +10,17 @@ export class Web3Service {
   private provider: ethers.BrowserProvider | null = null;
   private signer: ethers.JsonRpcSigner | null = null;
 
+  private async ensureProviderInitialized(): Promise<void> {
+    if (!this.provider && window.ethereum) {
+      try {
+        this.provider = new ethers.BrowserProvider(window.ethereum);
+      } catch (error) {
+        console.error('Failed to initialize provider:', error);
+        throw new Error('Failed to initialize Web3 provider');
+      }
+    }
+  }
+
   async connectWallet(): Promise<string> {
     if (!window.ethereum) {
       throw new Error('MetaMask is not installed. Please install MetaMask to continue.');
@@ -82,6 +93,8 @@ export class Web3Service {
 
   async getCurrentAccount(): Promise<string | null> {
     if (!window.ethereum) return null;
+
+    await this.ensureProviderInitialized();
 
     try {
       const accounts = await window.ethereum.request({
@@ -197,6 +210,8 @@ export class Web3Service {
   }
 
   async getBalance(address: string): Promise<string> {
+    await this.ensureProviderInitialized();
+    
     if (!this.provider) {
       throw new Error('Provider not initialized');
     }
@@ -206,6 +221,8 @@ export class Web3Service {
   }
 
   async getNetworkInfo() {
+    await this.ensureProviderInitialized();
+    
     if (!this.provider) {
       throw new Error('Provider not initialized');
     }
@@ -219,6 +236,8 @@ export class Web3Service {
   }
 
   async waitForTransaction(txHash: string) {
+    await this.ensureProviderInitialized();
+    
     if (!this.provider) {
       throw new Error('Provider not initialized');
     }
