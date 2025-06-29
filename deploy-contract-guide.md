@@ -49,17 +49,25 @@ This will:
 ## Step 5: Update Main Application
 
 1. Copy the deployed contract address
-2. Open your main project's `.env` file
-3. Update the contract address:
+2. Navigate back to the root directory:
+   ```bash
+   cd ..
+   ```
+3. Open your main project's `.env` file
+4. Update the contract address:
    ```
    VITE_NFT_CONTRACT_ADDRESS=0x_your_deployed_contract_address_here
    ```
 
 ## Step 6: Verify Deployment
 
-1. Restart your development server
-2. The "Contract Setup Required" message should disappear
-3. Users can now claim NFTs after purchase
+1. Make sure you're in the root directory (not in `contracts` folder)
+2. Restart your development server:
+   ```bash
+   npm run dev
+   ```
+3. The "Contract Setup Required" message should disappear
+4. Users can now claim NFTs after purchase
 
 ## Troubleshooting
 
@@ -74,6 +82,10 @@ This will:
 ### "Verification failed"
 - The contract is still deployed and functional
 - Verification is optional for testnet
+
+### "Missing script: dev" error
+- Make sure you're in the root directory when running `npm run dev`
+- If you're in the `contracts` folder, run `cd ..` first
 
 ## Contract Details
 

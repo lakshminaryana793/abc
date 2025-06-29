@@ -31,13 +31,23 @@ npm run deploy:amoy
 
 ### Step 4: Update Main App
 1. Copy the deployed contract address from the terminal
-2. Open your main `.env` file
-3. Update:
+2. Navigate back to the root directory:
+   ```bash
+   cd ..
+   ```
+3. Open your main `.env` file
+4. Update:
    ```
    VITE_NFT_CONTRACT_ADDRESS=0x_your_contract_address_here
    ```
 
 ### Step 5: Restart Development Server
+1. Make sure you're in the root directory (not in `contracts` folder)
+2. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
 The "Contract Setup Required" message will disappear and NFT claiming will work.
 
 ## What This Enables
@@ -52,6 +62,7 @@ The "Contract Setup Required" message will disappear and NFT claiming will work.
 **"Insufficient funds"** → Get more test MATIC from faucet
 **"Network error"** → Switch MetaMask to Polygon Amoy testnet
 **"Contract not found"** → Check contract address in .env file
+**"Missing script: dev"** → Make sure you're in the root directory, not `contracts` folder
 
 ## Contract Details
 - **Network**: Polygon Amoy Testnet (Chain ID: 80002)

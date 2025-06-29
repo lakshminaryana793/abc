@@ -107,12 +107,16 @@ npm run compile
 # Deploy to Polygon Amoy testnet
 npm run deploy:amoy
 
+# Return to root directory
+cd ..
+
 # Copy the deployed contract address to your .env file
 ```
 
 ### 5. Start Development Server
 
 ```bash
+# Make sure you're in the root directory
 npm run dev
 ```
 
@@ -203,6 +207,7 @@ npm run build
 cd contracts
 npm run deploy:polygon  # For mainnet
 npm run verify:polygon  # Verify on Polygonscan
+cd ..  # Return to root directory
 ```
 
 ### Database (Supabase)
@@ -237,6 +242,10 @@ Database is automatically managed through Supabase. Enable Row Level Security an
    - Confirm contract deployment and address
    - Check IPFS metadata upload
    - Verify wallet permissions
+
+4. **"Missing script: dev" Error**
+   - Make sure you're in the root directory when running `npm run dev`
+   - If you're in the `contracts` folder, run `cd ..` first
 
 ### Support
 
