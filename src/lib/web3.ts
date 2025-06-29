@@ -100,6 +100,12 @@ export class Web3Service {
       const accounts = await window.ethereum.request({
         method: 'eth_accounts',
       });
+      
+      // If we have an account and provider, ensure signer is initialized
+      if (accounts[0] && this.provider) {
+        this.signer = await this.provider.getSigner();
+      }
+      
       return accounts[0] || null;
     } catch (error) {
       console.error('Error getting current account:', error);
